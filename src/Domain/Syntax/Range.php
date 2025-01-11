@@ -16,11 +16,14 @@ class Range implements SyntaxInterface
 
     private ?float $boost;
 
-    public function __construct(string $field, array $definitions, ?float $boost = 1.0)
+    private ?bool $date;
+
+    public function __construct(string $field, array $definitions, ?float $boost = 1.0, ?bool $date = false)
     {
         $this->field = $field;
         $this->definitions = $definitions;
         $this->boost = $boost;
+        $this->date = $date;
         $this->validateDefinitions($definitions);
     }
 
@@ -36,7 +39,10 @@ class Range implements SyntaxInterface
         foreach ($definitions as $key => $value) {
             Assert::inArray($key, self::RELATIONS);
             Assert::notNull($value);
-            Assert::numeric($value);
+            
+            if (!$this->date) {
+                Assert::numeric($value);
+            }
         }
     }
 }
