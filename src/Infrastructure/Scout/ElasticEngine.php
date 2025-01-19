@@ -127,6 +127,22 @@ class ElasticEngine extends Engine
         return collect($results->hits())->pluck('_id')->values();
     }
 
+    private function hasModelClassName($results)
+    {
+        Assert::isInstanceOf($results, Results::class);
+
+        $first = collect($results->hits())->first();
+        if (null === $first) {
+            return false;
+        }
+
+        if (false === isset($first['_index'])) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Map the given results to instances of the given model.
      *
@@ -146,10 +162,26 @@ class ElasticEngine extends Engine
         $objectIds = $this->mapIds($results)->all();
         $objectIdPositions = array_flip($objectIds);
 
-        return $model->getScoutModelsByIds(
-            $builder,
-            $objectIds
-        )->filter(function ($model) use ($objectIds) {
+        $hits = collect($results->hits());
+        if (false === $this->hasModelClassName($results)) {
+            $data = $model->getScoutModelsByIds(
+                $builder,
+                $objectIds
+            );
+        } else {
+            $data = $hits->groupBy('_index')
+                ->map(function ($results, $index) use ($builder) {
+                    $model = new ($this->indexConfigurationRepository->findForIndex($index)->getModel());
+
+                    /* @var Searchable $model */
+                    return $models = $model->getScoutModelsByIds(
+                        $builder,
+                        $results->pluck('_id')->all()
+                    );
+                })
+                ->flatten();
+        }
+        return $data->filter(function ($model) use ($objectIds) {
             return in_array($model->getScoutKey(), $objectIds, false);
         })->sortBy(function ($model) use ($objectIdPositions) {
             return $objectIdPositions[$model->getScoutKey()];
@@ -167,10 +199,25 @@ class ElasticEngine extends Engine
         $objectIds = $this->mapIds($results)->all();
         $objectIdPositions = array_flip($objectIds);
 
-        return $model->getScoutModelsByIds(
-            $builder,
-            $objectIds
-        )->lazy()->filter(function ($model) use ($objectIds) {
+        if (false === $this->hasModelClassName($results)) {
+            $data = $model->getScoutModelsByIds(
+                $builder,
+                $objectIds
+            )->cursor();
+        } else {
+            $data = LazyCollection::make(function () use ($results, $builder) {
+                foreach ($results->hits() as $hit) {
+                    $model = new ($this->indexConfigurationRepository->findForIndex($hit['_index'])->getModel());
+
+                    /* @var Searchable $model */
+                    yield $model->getScoutModelsByIds(
+                        $builder, [$hit['_id']]
+                    )->first();
+                }
+            });
+        }
+
+        return $data->filter(function ($model) use ($objectIds) {
             return in_array($model->getScoutKey(), $objectIds, false);
         })->sortBy(function ($model) use ($objectIdPositions) {
             return $objectIdPositions[$model->getScoutKey()];
