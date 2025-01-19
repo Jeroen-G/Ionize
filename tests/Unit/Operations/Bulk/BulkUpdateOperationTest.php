@@ -6,6 +6,7 @@ namespace JeroenG\Explorer\Tests\Unit\Operations\Bulk;
 
 use JeroenG\Explorer\Application\Operations\Bulk\BulkUpdateOperation;
 use JeroenG\Explorer\Tests\Support\Models\TestModelWithoutSettings;
+use JeroenG\Explorer\Tests\Support\Models\TestModelWithIndexed;
 use JeroenG\Explorer\Tests\Support\Models\TestModelWithPrepare;
 use JeroenG\Explorer\Tests\Support\Models\TestModelWithSettings;
 use PHPUnit\Framework\TestCase;
@@ -71,6 +72,16 @@ class BulkUpdateOperationTest extends TestCase
         self::assertEquals([
             ['index' => [ '_index' => ':searchable_as:', '_id' => ':scout_key:' ]],
             [ 'data' => true, 'extra' => true ]
+        ], $operation->build());
+    }
+
+    public function test_it_builds_with_preparation_of_index_action(): void
+    {
+        $operation = new BulkUpdateOperation(':searchable_as:');
+        $operation->add(new TestModelWithIndexed());
+        self::assertEquals([
+            ['index' => [ '_index' => ':searchable_as:', '_id' => ':scout_key:', '_routing' => ':routing_key:' ]],
+            [ 'data' => true ]
         ], $operation->build());
     }
 }

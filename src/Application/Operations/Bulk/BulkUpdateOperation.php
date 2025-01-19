@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JeroenG\Explorer\Application\Operations\Bulk;
 
+use JeroenG\Explorer\Application\BeIndexed;
 use JeroenG\Explorer\Application\BePrepared;
 use JeroenG\Explorer\Application\Explored;
 
@@ -49,12 +50,18 @@ final class BulkUpdateOperation implements BulkOperationInterface
 
     private static function bulkActionSettings(Explored $model): array
     {
-        return [
+        $action = [
             'index' => [
                 '_index' => self::$indexName,
                 '_id' => $model->getScoutKey(),
             ]
         ];
+
+        if ($model instanceof BeIndexed) {
+            $action = $model->prepareIndexAction($action);
+        }
+
+        return $action;
     }
 
     private static function modelToData(Explored $model): array
